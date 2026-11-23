@@ -43,6 +43,8 @@ Depois de ~5 semanas de uso diário em 20 projetos (Python, FastAPI, automação
 | Decisões com motivo | 311 |
 | Sessões registradas | 251 |
 
+**De onde vêm esses números:** ninguém escreve essas notas à mão. Cada entrega concluída pelo agente (uma tarefa, não um commit) gera 1 nota de sessão e, em média, ~5 notas atômicas (decisões, padrões e aprendizados). Foram 31 dias com uso, ~8 entregas por dia, somando Claude Code e Codex em vários projetos ao mesmo tempo. Só 4 sessões vieram de importação inicial (backfill) de projetos anteriores. O cofre em si fica fora deste repositório: aqui está só o código.
+
 **Exemplo:** num projeto, o agente descobriu que o TikTok bloqueia o IP depois de ~10 páginas seguidas. Semanas depois, em outro projeto, o aviso chegou **antes** da primeira requisição.
 
 ## Como usar
@@ -79,6 +81,12 @@ python _Sistema/cerebro.py reindex                          # regenera o Painel.
 - **Por que hooks e não uma ferramenta MCP?** O agente não precisa *lembrar de lembrar*. A memória é injetada sempre, e o registro é cobrado no fim de cada entrega.
 - **Por que só a biblioteca padrão do Python?** Um único arquivo que roda em qualquer máquina com Python 3.10+, sem `pip install`.
 - **Hooks nunca quebram o agente:** qualquer erro vai para o `_Sistema/log.txt` e o hook sai em silêncio.
+
+## Limitações conhecidas
+
+- **Stemmer simples:** tira o plural e corta a palavra em 6 letras. É rápido e junta variações ("deploy", "deployment"), mas pode juntar palavras diferentes ("importar" e "importante"). O limite mínimo de relevância (2 termos em comum ou um termo no título/tags) segura a maior parte dos falsos positivos.
+- **Sem sinônimos:** "OOM" e "estouro de memória" não se encontram. É o caso em que embeddings ganhariam.
+- **Próximo passo:** um conjunto de ~30 pares (pedido → nota esperada) nos testes para medir Recall@5 a cada mudança de pesos ou de stemmer.
 
 ## Testes
 

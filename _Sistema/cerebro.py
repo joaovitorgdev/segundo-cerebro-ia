@@ -121,12 +121,19 @@ def ler_nota(path):
     fm, body = {}, text
     m = re.match(r"---\r?\n(.*?)\r?\n---\r?\n?(.*)", text, re.S)
     if m:
+        chave = None
         for line in m.group(1).splitlines():
+            item = line.strip()
+            # lista YAML em várias linhas ("tags:" e depois "  - x"), como o Obsidian grava
+            if item.startswith("- ") and chave is not None and isinstance(fm.get(chave), list):
+                fm[chave].append(parse_val(item[2:]))
+                continue
             if line[:1] in (" ", "\t", "-", "#"):
                 continue
             k, sep, v = line.partition(":")
             if sep and k.strip():
-                fm[k.strip()] = parse_val(v)
+                chave = k.strip()
+                fm[chave] = [] if not v.strip() else parse_val(v)
         body = m.group(2)
     return fm, body
 

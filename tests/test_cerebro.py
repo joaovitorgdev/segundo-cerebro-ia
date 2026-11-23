@@ -45,3 +45,14 @@ def test_registra_e_recupera_em_outro_projeto(tmp_path):
 def test_recall_sem_relacao_nao_inventa(tmp_path):
     script = cofre_temporario(tmp_path)
     assert "Nenhuma nota" in rodar(script, "recall", "receita de bolo de cenoura")
+
+
+def test_le_tags_em_lista_multilinha_do_obsidian(tmp_path):
+    script = cofre_temporario(tmp_path)
+    nota = tmp_path / "06-Aprendizados" / "Cache do navegador esconde dados.md"
+    nota.parent.mkdir()
+    for i, tema in enumerate(["receita de bolo", "jardinagem", "futebol", "viagem", "musica"]):
+        (nota.parent / f"Outro {i}.md").write_text(f"---\ntipo: aprendizado\n---\n{tema}\n", encoding="utf-8")
+    nota.write_text("---\ntipo: aprendizado\ntags:\n  - fastapi\n  - deploy\nresumo: \"x\"\n---\nTexto curto.\n",
+                    encoding="utf-8")
+    assert "Cache do navegador" in rodar(script, "recall", "fastapi deploy")

@@ -1,0 +1,9 @@
+# suas notas ficam fora do repositório do código
+0*-*/
+Painel.md
+_Sistema/inbox/
+_Sistema/.estado/
+_Sistema/log.txt
+__pycache__/
+.pytest_cache/
+.obsidian/workspace*.json

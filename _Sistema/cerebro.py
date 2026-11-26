@@ -349,8 +349,22 @@ def normaliza_item(item):
     return {"titulo": clean(re.split(r"[.—]", s)[0], 80), "descricao": s, "extra": {}}
 
 
+def marcar_substituida(tipo, antigo, nova, proj, data):
+    """Marca a nota antiga como substituída pela nova, sem apagar o texto dela (fica como histórico)."""
+    antigo = re.sub(r"[\[\]]", "", str(antigo)).strip()
+    for cand in (f"{proj} - {antigo}", antigo):  # decisões levam o projeto no nome do arquivo
+        p = VAULT / DIRS[tipo] / f"{clean(cand)}.md"
+        if p.exists() and p.stem != nova:
+            atualizar_fm(p, substituida_por=f"[[{nova}]]")
+            append_under(p, "Substituída", f"- {data}: substituída por [[{nova}]]; o texto acima fica como histórico.")
+            return p.stem
+    log(f"substitui: nota '{antigo}' não encontrada em {DIRS[tipo]}")
+    return None
+
+
 def nota_atomica(tipo, item, proj, sess, extras_tags):
     it = normaliza_item(item)
+    substitui = listify(it["extra"].pop("substitui", None))
     nome = clean(f"{proj} - {it['titulo']}") if tipo == "decisao" else clean(it["titulo"])
     path = VAULT / DIRS[tipo] / f"{nome}.md"
     data = f"{datetime.now():%Y-%m-%d}"
@@ -370,6 +384,9 @@ def nota_atomica(tipo, item, proj, sess, extras_tags):
         escrever_nota(path, {
             "tipo": tipo, "projetos": [f"[[{proj}]]"], "data": data, "atualizado": data,
             "tags": tags_de(tipo, proj, extras_tags), "resumo": uma_linha(it["descricao"] or it["titulo"])}, corpo)
+    antigas = [a for a in (marcar_substituida(tipo, s, nome, proj, data) for s in substitui if s) if a]
+    if antigas:
+        atualizar_fm(path, substitui=[f"[[{a}]]" for a in antigas])
     return nome
 
 
@@ -504,6 +521,20 @@ Veja [[LEIA-ME]] para entender o funcionamento. O bloco abaixo é gerado automat
 
 
 # ---------- recall ----------
+PESO_SUBSTITUIDA = 0.3  # lição já superada continua achável, mas perde para a que a substituiu
+BONUS_RECENTE = 0.15    # até +15% para nota atualizada hoje, caindo a zero em DIAS_FRESCOR
+DIAS_FRESCOR = 180
+
+
+def frescor(fm):
+    """1.0 para nota atualizada hoje, 0.0 a partir de DIAS_FRESCOR dias (ou sem data)."""
+    try:
+        dias = (datetime.now() - datetime.strptime(str(fm.get("atualizado") or fm.get("data"))[:10], "%Y-%m-%d")).days
+    except ValueError:
+        return 0.0
+    return max(0.0, 1 - max(dias, 0) / DIAS_FRESCOR)
+
+
 def indexar(n):
     fm = n["fm"]
     T = set(tokens(n["titulo"]))
@@ -547,6 +578,9 @@ def recall(texto, cwd=None, n=5, excluir=()):
         pj = " ".join(listify(x["fm"].get("projetos")) + listify(x["fm"].get("projeto")))
         if proj and f"[[{proj}]]" in pj:
             score *= 1.15
+        if x["fm"].get("substituida_por"):
+            score *= PESO_SUBSTITUIDA
+        score *= 1 + BONUS_RECENTE * frescor(x["fm"])
         if (hit >= min(2, len(Q)) and score >= 4 or forte and score >= 5) and str(x["path"]) not in excluir:
             res.append((score, x))
     res.sort(key=lambda t: -t[0])
@@ -572,7 +606,9 @@ def formatar_recall(res, completo=3):
     for i, n in enumerate(res, 1):
         proj = ", ".join(re.sub(r"[\[\]]", "", str(p)) for p in
                          (listify(n["fm"].get("projetos")) + listify(n["fm"].get("projeto")))) or "—"
-        L.append(f"{i}. [{n['tipo']}] {n['titulo']} · projeto(s): {proj} · {fwd(n['path'])}")
+        sub = n["fm"].get("substituida_por")
+        aviso = " · ⚠️ SUBSTITUÍDA por " + re.sub(r"[\[\]]", "", str(sub)) + " (use a nova)" if sub else ""
+        L.append(f"{i}. [{n['tipo']}] {n['titulo']} · projeto(s): {proj}{aviso} · {fwd(n['path'])}")
         L.append(f"   {trecho(n, 500 if i <= completo else 160)}")
     return "\n".join(L)[:6000]
 
@@ -731,13 +767,15 @@ def hook_stop(agente):
               "padroes": [{"titulo": "...", "descricao": "..."}],
               "preferencias": [{"titulo": "...", "descricao": "..."}],
               "stack": ["Tecnologia: como foi usada"],
-              "aprendizados": [{"titulo": "...", "descricao": "armadilha, causa raiz, solução"}],
+              "aprendizados": [{"titulo": "...", "descricao": "armadilha, causa raiz, solução",
+                                "substitui": "<opcional: título exato da nota antiga que esta contradiz>"}],
               "arquivos": ["caminhos principais alterados"], "tags": ["tema1", "tema2"]}
     reason = (
         "🧠 CÉREBRO (automático — não pergunte nada ao usuário): a entrega foi concluída; registre agora o aprendizado no segundo cérebro. "
         f"Use a ferramenta Write para criar o arquivo {arq} com JSON neste formato (ajuste os valores; omita listas sem conteúdo útil; "
         "inclua apenas o que for REUTILIZÁVEL em outros projetos: decisões com motivo, padrões de código/arquitetura, preferências do usuário, "
-        "stack usada, armadilhas e soluções; escreva em português):\n"
+        "stack usada, armadilhas e soluções; escreva em português; se um item contradiz uma nota que o cérebro trouxe antes, "
+        "ponha o título exato dela em \"substitui\": a antiga é marcada como substituída, sem apagar):\n"
         + json.dumps(modelo, ensure_ascii=False)
         + "\nNão rode mais nada: o hook ingere o arquivo sozinho. Depois responda apenas com uma linha curta, ex.: '🧠 Registrado no cérebro.'")
     print(json.dumps({"decision": "block", "reason": reason}, ensure_ascii=False))

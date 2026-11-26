@@ -56,3 +56,26 @@ def test_le_tags_em_lista_multilinha_do_obsidian(tmp_path):
     nota.write_text("---\ntipo: aprendizado\ntags:\n  - fastapi\n  - deploy\nresumo: \"x\"\n---\nTexto curto.\n",
                     encoding="utf-8")
     assert "Cache do navegador" in rodar(script, "recall", "fastapi deploy")
+
+
+def test_licao_nova_substitui_antiga_sem_apagar(tmp_path):
+    script = cofre_temporario(tmp_path)
+    antiga = {"projeto": "projeto-a", "titulo": "Cache",
+              "aprendizados": [{"titulo": "Cache de sessão em SQLite",
+                                "descricao": "Guardar o cache de sessão em SQLite local basta."}]}
+    nova = {"projeto": "projeto-a", "titulo": "Cache 2",
+            "aprendizados": [{"titulo": "Cache de sessão em Redis",
+                              "descricao": "SQLite travou com escrita concorrente no cache de sessão; usar Redis.",
+                              "substitui": "Cache de sessão em SQLite"}]}
+    rodar(script, "registrar", "--stdin", entrada=json.dumps(antiga))
+    rodar(script, "registrar", "--stdin", entrada=json.dumps(nova))
+
+    texto_antigo = (tmp_path / "06-Aprendizados" / "Cache de sessão em SQLite.md").read_text(encoding="utf-8")
+    assert 'substituida_por: "[[Cache de sessão em Redis]]"' in texto_antigo
+    assert "Guardar o cache de sessão em SQLite local basta." in texto_antigo  # histórico mantido
+    texto_novo = (tmp_path / "06-Aprendizados" / "Cache de sessão em Redis.md").read_text(encoding="utf-8")
+    assert "[[Cache de sessão em SQLite]]" in texto_novo
+
+    saida = rodar(script, "recall", "cache de sessão sqlite", "--cwd", str(tmp_path / "projeto-b"))
+    assert saida.index("Cache de sessão em Redis") < saida.index("Cache de sessão em SQLite")
+    assert "SUBSTITUÍDA por Cache de sessão em Redis" in saida

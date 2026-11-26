@@ -82,7 +82,19 @@ python _Sistema/cerebro.py reindex                          # regenera o Painel.
 - **Por que só a biblioteca padrão do Python?** Um único arquivo que roda em qualquer máquina com Python 3.10+, sem `pip install`.
 - **Hooks nunca quebram o agente:** qualquer erro vai para o `_Sistema/log.txt` e o hook sai em silêncio.
 
+## Lições que se contradizem
+
+Nada é apagado. Se o agente registra uma lição que contradiz outra, ele informa `"substitui": "<título da antiga>"`:
+
+- a nota antiga ganha `substituida_por: [[nova]]` e uma seção "Substituída", mas o texto fica como histórico;
+- a nova ganha `substitui: [[antiga]]`, e o grafo do Obsidian mostra a ligação;
+- na busca, a antiga vale 30% do peso e aparece marcada "⚠️ SUBSTITUÍDA por …", e notas recentes ganham até +15%.
+
+Por que não reescrever: o agente pode errar ao julgar uma contradição, e muitas são de contexto (SQLite num projeto, Postgres em outro). Apagando, o erro some sem ninguém ver; marcando, dá para conferir e desfazer.
+
 ## Limitações conhecidas
+
+- **Contradição não é detectada sozinha:** quem marca a substituição é o agente, quando percebe o conflito com uma nota que o cérebro trouxe. Duas lições conflitantes que ele não ligou continuam lado a lado (a mais recente pesa um pouco mais).
 
 - **Stemmer simples:** tira o plural e corta a palavra em 6 letras. É rápido e junta variações ("deploy", "deployment"), mas pode juntar palavras diferentes ("importar" e "importante"). O limite mínimo de relevância (2 termos em comum ou um termo no título/tags) segura a maior parte dos falsos positivos.
 - **Sem sinônimos:** "OOM" e "estouro de memória" não se encontram. É o caso em que embeddings ganhariam.
